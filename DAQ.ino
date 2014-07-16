@@ -48,11 +48,11 @@ void setup()
   {
     case 2:
       eventInterrupt = 1;
-      intFlag = INTF1;
+      intFlag = bit(INTF1);
       break;
     case 3:
       eventInterrupt = 0;
-      intFlag = INTF0;
+      intFlag = bit(INTF0);
       break;  
   }
   detachInterrupt(eventInterrupt);  //Safeguard to prevent any other service from acting at this pin
@@ -72,7 +72,7 @@ void loop()
             buffer[bufferPos] = Serial.read();
             if(buffer[bufferPos]=='\n'||buffer[bufferPos]=='\r'||buffer[bufferPos]=='\0')   //If we reached an EOL character,
             {
-              if(DEBUG) {Serial.println("Buffer filled - reading...");}                  
+              if(DEBUG) {Serial.print("DBG-Buffer filled - reading...\n");}                  
               readBuffer();  //Read the buffer
             }
             //if(DEBUG && (buffer[bufferPos]=='\n'||buffer[bufferPos]=='\r'||buffer[bufferPos]=='\0')) {Serial.print("Read 1 character");}
@@ -84,7 +84,7 @@ void loop()
   {
     if(msgToSend)  // Check for a message to send; if there is one,
     {
-      if(DEBUG) {Serial.println("Message found. Sending...");}
+      if(DEBUG) {Serial.print("DBG-Message found. Sending...\n");}
       msgToSend=false;  //Reset message flag
       printBufferToSerial(true);  //Print the buffer to the serial connection
       isAcquiring=false; //Reset state flag
@@ -98,19 +98,23 @@ void readBuffer()
 {    
   //char tempStr[MAX_BUFFER_SIZE];
   //strToLower(buffer,tempStr);
-  if(DEBUG) 
+  if(DEBUG) //Dump buffer contents if desired
   {
-    Serial.print("Buffer contents:");
-    Serial.println(buffer);
+    Serial.print("MSG-Buffer contents:");
+    for(int idx=0; buffer[idx]!='\n' && idx < bufferPos;idx++)
+    {
+      Serial.print(buffer[idx]);
+    }
+    Serial.print("End of Buffer.\n");
   }
   if(strncmp(buffer,"aq",bufferPos-1)==0)  //If we wish to acquire some data,
    {
      isAcquiring = true;  //Set the state flag
      bufferPos=0;  //Reset the buffer position
-     Serial.println("ACK-Command 'aq' received");  //Acknowledge receipt of command
+     Serial.print("ACK-Command 'aq' received\n");  //Acknowledge receipt of command
      EIFR = intFlag;  //Reset the EIFR before attaching the interrupt to start waiting for events
      attachInterrupt(eventInterrupt,catchEvent,RISING);
-     if(VERBOSE) {Serial.println("Currently waiting for events...");}
+     if(VERBOSE) {Serial.print("MSG-Currently waiting for events...\n");}
    }
    //Add more commands here as necessary
 }
@@ -119,8 +123,8 @@ void readBuffer()
 void writeBuffer(const char strToWrite[])   //Assume that character string is null-terminated
 { 
   volatile int len = strlen(strToWrite);  //Get the length of the string to make sure it isn't too long and is terminated properly
-  if(len > MAX_BUFFER_SIZE-1){Serial.println("ERR-Buffer Write Failed: String too long.\n");}
-  else if(strToWrite[len] != '\0'){Serial.println("ERR-Buffer Write Failed: String not null-terminated.\n");}  
+  if(len > MAX_BUFFER_SIZE-1){Serial.print("ERR-Buffer Write Failed: String too long.\n");}
+  else if(strToWrite[len] != '\0'){Serial.print("ERR-Buffer Write Failed: String not null-terminated.\n");}  
   else {memcpy(buffer,strToWrite,len);}  //Copy the string to the buffer
 }
 
@@ -135,8 +139,8 @@ void printBufferToSerial(boolean resetBuffer)
     tempPos++;
   }
   Serial.print('\n');  //Print the appropriate terminating character
-  delay(MSG_DELAY);
-  if(VERBOSE) {Serial.println("MSG-Message Sent.");}
+  delay(MSG_DELAY);	//Delay to ensure receipt of message
+  if(VERBOSE) {Serial.print("MSG-Message Sent.\n");}
   if(resetBuffer) {bufferPos=0;}  //If we wish to reset the buffer, reset the buffer position to the start
 }
 
@@ -155,9 +159,9 @@ void catchEvent()
   }
   if(timeNow-lastTriggerTime > interruptDiscard)  //If this interrupt has been called long enough after the last trigger time, catch the event.
   {
-    if(DEBUG) {Serial.println("MSG-Event triggered.");}
-    writeBuffer("MSG-Event captured.\0");
-    
+    if(DEBUG) {Serial.print("DBG-Event triggered.\n");}
+    writeBuffer("DAT-Event captured.\0");	// Here's the item of interest - an event triggered by the pedal
+        
     //Process the call as an actual event
     msgToSend = true;
     lastTriggerTime=timeNow; 
